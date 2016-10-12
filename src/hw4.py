@@ -1,5 +1,4 @@
 import tensorflow as tf
-import math
 
 sess = tf.InteractiveSession()
 
