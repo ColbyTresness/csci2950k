@@ -80,6 +80,6 @@ for e in range(EPOCHS):
 print("testing")
 # test
 err = sess.run(error, feed_dict = {inpt: trainList[0 : len(testList)-1], out: trainList[1 : len(testList)]})
-print("test perplexity %g"%perplexity.eval(feed_dict = {inpt: testList[x : x + len(testList)-1], out: testList[x+1 : x+len(testList)]}))
+print("test perplexity %g"%perplexity.eval(feed_dict = {inpt: testList[0 : len(testList)-1], out: testList[1 : len(testList)]}))
 
 # 293.386
