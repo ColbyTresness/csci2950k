@@ -35,10 +35,10 @@ vocabCounts = Counter(vocab)
 wordIndices = {}
 counter = 1
 for word in vocabCounts:
-	if counter < VOCABSIZE:
+	if counter < VOCABSIZE-1:
 		wordIndices[word] = counter
 	else:
-		wordIndices[word] = VOCABSIZE
+		wordIndices[word] = VOCABSIZE-1
 	counter += 1
 
 trainWords = list()
