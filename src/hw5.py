@@ -146,3 +146,7 @@ while i + BATCHSIZE*NUMSTEPS + 1 < len(tests):
 print("testing perplexity: ")
 print(math.exp(lsum/iters))
 
+
+
+# crime and punishment, 10 EPOCHS, perplexity = 147.855
+# count of monte cristo, 1 EPOCH, perplexity = 25.655
