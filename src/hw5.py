@@ -21,12 +21,12 @@ def basic_tokenizer(sentence, word_split=re.compile(b"([.,!?\"':;)(])")):
 
 # Open file
 book = open(BOOKPATH, "rb")
-
 vocab = basic_tokenizer(book.read())
+
 vocabCounts = Counter(vocab)
 
+# build word -> int map
 wordIndices = {}
-
 counter = 1
 for word in vocabCounts:
 	if counter < 8000:
@@ -38,6 +38,7 @@ for word in vocabCounts:
 trainWords = list()
 testWords = list()
 
+# build training and testing data
 vocabSize = maxVocabSize + 1
 i = 0
 for word in vocab:
@@ -57,7 +58,7 @@ BATCHSIZE = 50
 TRAININGRATE = 1e-4
 NUMSTEPS = 20
 LSTMSIZE = 256
-EPOCHS = 1
+EPOCHS = 10
 
 print("creating model")
 # Create the model
@@ -88,10 +89,8 @@ y1d = tf.reshape(y, [BATCHSIZE*NUMSTEPS])
 loss1 = tf.nn.seq2seq.sequence_loss_by_example([logits], [y1d], [wgts])
 loss = tf.reduce_sum(loss1)
 
-# set up training step
 trainStep = tf.train.AdamOptimizer(TRAININGRATE).minimize(loss)
 
-# initialize
 sess.run(tf.initialize_all_variables())
 
 print("training")
@@ -99,6 +98,7 @@ print("training")
 lsum = 0
 iters = 0
 for e in range(EPOCHS):
+	print("epoch " + str(e))
 	i = 0
 	state = (np.zeros([BATCHSIZE, LSTMSIZE]), np.zeros([BATCHSIZE, LSTMSIZE]))
 	while i + BATCHSIZE*NUMSTEPS + 1 < len(trains):
@@ -108,38 +108,31 @@ for e in range(EPOCHS):
 						 y: np.reshape(trains[i+1 : i+1+BATCHSIZE*NUMSTEPS], (BATCHSIZE, NUMSTEPS)),  
 						 keep_prob: .5,
 						 initialState: state})
-		print(math.exp(l/(BATCHSIZE*NUMSTEPS)))
+		#print(math.exp(l/(BATCHSIZE*NUMSTEPS)))
 		i += BATCHSIZE*NUMSTEPS
 		lsum += (l / (BATCHSIZE*NUMSTEPS))
 		state = nextstate
 print("train perplexity: ")
 print(math.exp(lsum/iters))
-print("lsum: ")
-print(lsum)
-print("iters: ")
-print(iters)
-print("lsum/iters: ")
-print(lsum/iters)
 
 
 print("testing")
 # test
 iters = 0
 lsum = 0
-for e in range(EPOCHS):
-	i = 0
-	state = (np.zeros([BATCHSIZE, LSTMSIZE]), np.zeros([BATCHSIZE, LSTMSIZE]))
-	while i + BATCHSIZE*NUMSTEPS + 1 < len(tests):
-		iters += 1
-		nextstate, _, l = sess.run([outst, trainStep, loss], 
-			feed_dict = {x: np.reshape(tests[i : i + BATCHSIZE*NUMSTEPS], (BATCHSIZE, NUMSTEPS)),
-						 y: np.reshape(tests[i+1 : i+1+BATCHSIZE*NUMSTEPS], (BATCHSIZE, NUMSTEPS)),
-						 keep_prob: 1.0, 
-						 initialState: state})
-		print(math.exp(l/(BATCHSIZE*NUMSTEPS)))
-		i += BATCHSIZE*NUMSTEPS
-		state = nextstate
-		lsum += (l / (BATCHSIZE*NUMSTEPS))
+i = 0
+state = (np.zeros([BATCHSIZE, LSTMSIZE]), np.zeros([BATCHSIZE, LSTMSIZE]))
+while i + BATCHSIZE*NUMSTEPS + 1 < len(tests):
+	iters += 1
+	nextstate, _, l = sess.run([outst, trainStep, loss], 
+		feed_dict = {x: np.reshape(tests[i : i + BATCHSIZE*NUMSTEPS], (BATCHSIZE, NUMSTEPS)),
+					 y: np.reshape(tests[i+1 : i+1+BATCHSIZE*NUMSTEPS], (BATCHSIZE, NUMSTEPS)),
+					 keep_prob: 1.0, 
+					 initialState: state})
+	#print(math.exp(l/(BATCHSIZE*NUMSTEPS)))
+	i += BATCHSIZE*NUMSTEPS
+	state = nextstate
+	lsum += (l / (BATCHSIZE*NUMSTEPS))
 print("test perplexity: ")
 print(math.exp(lsum/iters))
 
