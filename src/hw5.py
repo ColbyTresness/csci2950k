@@ -6,10 +6,17 @@ import numpy as np
 
 sess = tf.InteractiveSession()
 
-BOOKPATH = "../data/crimeandpunishment.txt"
-maxVocabSize = 8000
+# constants
+BOOKPATH = "../data/countofmontecristo.txt"
+EMBEDSIZE = 50
+BATCHSIZE = 50
+TRAININGRATE = 1e-4
+NUMSTEPS = 20
+LSTMSIZE = 256
+EPOCHS = 10
+VOCABSIZE = 8001
 
-
+# tokenizer
 def basic_tokenizer(sentence, word_split=re.compile(b"([.,!?\"':;)(])")):
     """
     Very basic tokenizer: split the sentence into a list of tokens, lowercase.
@@ -19,27 +26,25 @@ def basic_tokenizer(sentence, word_split=re.compile(b"([.,!?\"':;)(])")):
         words.extend(re.split(word_split, space_separated_fragment))
     return [w.lower() for w in words if w]
 
-# Open file
+# file, get vocabulary, tokenize vocabulary
 book = open(BOOKPATH, "rb")
 vocab = basic_tokenizer(book.read())
-
 vocabCounts = Counter(vocab)
 
 # build word -> int map
 wordIndices = {}
 counter = 1
 for word in vocabCounts:
-	if counter < 8000:
+	if counter < VOCABSIZE:
 		wordIndices[word] = counter
 	else:
-		wordIndices[word] = 8000
+		wordIndices[word] = VOCABSIZE
 	counter += 1
 
 trainWords = list()
 testWords = list()
 
-# build training and testing data
-vocabSize = maxVocabSize + 1
+# build training and testing data lists
 i = 0
 for word in vocab:
 	i += 1
@@ -52,45 +57,52 @@ trains = np.array(trainWords)
 tests = np.array(testWords)
 
 
-# constants
-EMBEDSIZE = 50
-BATCHSIZE = 50
-TRAININGRATE = 1e-4
-NUMSTEPS = 20
-LSTMSIZE = 256
-EPOCHS = 10
 
 print("creating model")
 # Create the model
+# placeholders for x, y, and keep_prob
 x = tf.placeholder(tf.int32, [BATCHSIZE, NUMSTEPS])
 y = tf.placeholder(tf.int32, [BATCHSIZE, NUMSTEPS])
 keep_prob = tf.placeholder(tf.float32)
 
-E = tf.Variable(tf.random_uniform([vocabSize, EMBEDSIZE], minval=-1, maxval=1, dtype=tf.float32, seed=0))
+# embed matrix and lookup
+E = tf.Variable(tf.random_uniform([VOCABSIZE, EMBEDSIZE], minval=-1, maxval=1, dtype=tf.float32, seed=0))
 embed = tf.nn.embedding_lookup(E, x)
 
+# lstm
 basicLSTMCell = tf.nn.rnn_cell.BasicLSTMCell(LSTMSIZE, state_is_tuple=True)
 initialState = basicLSTMCell.zero_state(BATCHSIZE, tf.float32)
 
-w = tf.Variable(tf.truncated_normal([LSTMSIZE, vocabSize], stddev=0.1))
-b = tf.Variable(tf.constant(0.1, shape=[vocabSize]))
+# weight and bias
+w = tf.Variable(tf.truncated_normal([LSTMSIZE, VOCABSIZE], stddev=0.1))
+b = tf.Variable(tf.constant(0.1, shape=[VOCABSIZE]))
 
+# dropout step
 embedDrop = tf.nn.dropout(embed, keep_prob)
 
+# run embeddings through lstm
 rnn, outst = dyrnn = tf.nn.dynamic_rnn(basicLSTMCell, embedDrop, initial_state = initialState)
 
+# reshape to 2d
 rnn2 = tf.reshape(rnn, [BATCHSIZE * NUMSTEPS, LSTMSIZE])
 
+# get logits
 logits = tf.matmul(rnn2, w) + b
 
+# new weights
 wgts = tf.Variable(tf.constant(1.0, shape=[BATCHSIZE*NUMSTEPS]))
+
+# reshape y to 1d
 y1d = tf.reshape(y, [BATCHSIZE*NUMSTEPS])
 
+# loss calculation
 loss1 = tf.nn.seq2seq.sequence_loss_by_example([logits], [y1d], [wgts])
 loss = tf.reduce_sum(loss1)
 
+# optimization step
 trainStep = tf.train.AdamOptimizer(TRAININGRATE).minimize(loss)
 
+# initialize variables
 sess.run(tf.initialize_all_variables())
 
 print("training")
@@ -108,11 +120,10 @@ for e in range(EPOCHS):
 						 y: np.reshape(trains[i+1 : i+1+BATCHSIZE*NUMSTEPS], (BATCHSIZE, NUMSTEPS)),  
 						 keep_prob: .5,
 						 initialState: state})
-		#print(math.exp(l/(BATCHSIZE*NUMSTEPS)))
 		i += BATCHSIZE*NUMSTEPS
 		lsum += (l / (BATCHSIZE*NUMSTEPS))
 		state = nextstate
-print("train perplexity: ")
+print("training perplexity: ")
 print(math.exp(lsum/iters))
 
 
@@ -129,10 +140,9 @@ while i + BATCHSIZE*NUMSTEPS + 1 < len(tests):
 					 y: np.reshape(tests[i+1 : i+1+BATCHSIZE*NUMSTEPS], (BATCHSIZE, NUMSTEPS)),
 					 keep_prob: 1.0, 
 					 initialState: state})
-	#print(math.exp(l/(BATCHSIZE*NUMSTEPS)))
 	i += BATCHSIZE*NUMSTEPS
 	state = nextstate
 	lsum += (l / (BATCHSIZE*NUMSTEPS))
-print("test perplexity: ")
+print("testing perplexity: ")
 print(math.exp(lsum/iters))
 
